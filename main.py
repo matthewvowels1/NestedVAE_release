@@ -49,12 +49,12 @@ def main(args):
 	                           device=device).to(device)
 
 	print('Train outer VAE first.')
-	optimizer_outer = torch.optim.AdamW(outer_VAE.parameters(), lr=args.learning_rate)
+	optimizer_outer = torch.optim.AdamW(outer_VAE.parameters(), lr=args.learning_rate_outer)
 	if args.existing_outer_model_path == 'None':
 		trainer.train(model=outer_VAE,
 	              inner_model=False,
 	              optimizer=optimizer_outer,
-	              iterations=args.max_iters,
+	              iterations=args.max_iters_outer,
 	              device=device,
 	              batch_size=args.batch_size,
 	              save_iter=args.save_iter,
@@ -80,7 +80,7 @@ def main(args):
 			trainer.train(model=outer_VAE,
 			              inner_model=False,
 			              optimizer=optimizer_outer,
-			              iterations=args.max_iters,
+			              iterations=args.max_iters_outer,
 			              device=device,
 			              batch_size=args.batch_size,
 			              save_iter=args.save_iter,
@@ -119,13 +119,13 @@ def main(args):
 
 
 	print('Train inner VAE.')
-	optimizer_inner = torch.optim.AdamW(inner_VAE.parameters(), lr=args.learning_rate)
+	optimizer_inner = torch.optim.AdamW(inner_VAE.parameters(), lr=args.learning_rate_inner)
 	if args.existing_inner_model_path == 'None':  # if no specified checkpoint file is given, train the model
 		print('No existing model path specified, training from scratch for {} iterations.'.format(args.max_iters))
 		trainer.train(model=inner_VAE,
 		              inner_model=True,
 		              optimizer=optimizer_inner,
-		              iterations=args.max_iters,
+		              iterations=args.max_iters_inner,
 		              device=device,
 		              batch_size=args.batch_size,
 		              save_iter=args.save_iter,
@@ -152,7 +152,7 @@ def main(args):
 			trainer.train(model=inner_VAE,
 			              inner_model=True,
 			              optimizer=optimizer_inner,
-			              iterations=args.max_iters,
+			              iterations=args.max_iters_inner,
 			              device=device,
 			              batch_size=args.batch_size,
 			              save_iter=args.save_iter,
@@ -248,10 +248,16 @@ if __name__ == '__main__':
 		help="Batch size for training"
 	)
 	parser.add_argument(
-		"--max_iters",
+		"--max_iters_inner",
 		type=int,
 		default=100,
-		help="Iterations for training."
+		help="Iterations for training the inner VAE."
+	)
+	parser.add_argument(
+		"--max_iters_outer",
+		type=int,
+		default=100,
+		help="Iterations for training the outer VAE."
 	)
 	parser.add_argument(
 		"--eval_interval",
@@ -266,12 +272,17 @@ if __name__ == '__main__':
 		help="Number of evaluation batches to estimate loss with."
 	)
 	parser.add_argument(
-		"--learning_rate",
+		"--learning_rate_inner",
 		type=float,
 		default=3e-4,
-		help="Iterations for training."
+		help="Iterations for training the inner VAE."
 	)
-
+	parser.add_argument(
+		"--learning_rate_outer",
+		type=float,
+		default=3e-4,
+		help="Iterations for training the outer VAE."
+	)
 	parser.add_argument(
 		"--save_iter",
 		type=int,

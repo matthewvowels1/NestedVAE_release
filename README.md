@@ -6,7 +6,8 @@ Uses the Adult dataset.
 Example CLI:
 
 python3 main.py --dataset adult \
---max_iters 50000 \
+--max_iters_inner 100000 \
+--max_iters_outer 50000 \
 --validation_fraction 0.3 \
 --device cuda \
 --existing_inner_model_path  None \
@@ -17,7 +18,8 @@ python3 main.py --dataset adult \
 --num_neurons 32 \
 --eval_interval 2000 \
 --eval_iters 50 \
---learning_rate 1e-3 \
+--learning_rate_outer 1e-3 \
+--learning_rate_inner 1e-4 \
 --save_iter 50000 \
 --dropout_rate 0.3 \
 --n_layers 5 \
