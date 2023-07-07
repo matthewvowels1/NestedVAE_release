@@ -1,7 +1,20 @@
 # NestedVAE_release
 Release for Nested VAE: https://openaccess.thecvf.com/content_CVPR_2020/papers/Vowels_NestedVAE_Isolating_Common_Factors_via_Weak_Supervision_CVPR_2020_paper.pdf
 
-Uses the Adult dataset.
+Runs the Adult dataset.
+
+When transfer_evaluation = False:
+Balanced accuracy for sensitive factor on original data (excluding sensitive factor): 0.8516335258720195
+Balanced accuracy for target factor on original data (excluding sensitive factor): 0.8329596696559761
+Balanced accuracy for sensitive factor on outerVAE embeddings: 0.6594728609008579
+Balanced accuracy for target factor on outerVAE embeddings: 0.7278588437959164
+Balanced accuracy for sensitive factor on inner VAE embeddings: 0.6339402052438536
+Balanced accuracy for target factor on inner VAE embeddings: 0.70786467041597
+
+When transfer_evaluation = True:
+Balanced accuracy for target factor on inner VAE embeddings: 0.5962623839569002
+Adjusted Parity across the two transfer domains:  0.2614595002631862  for  domain scores [0.59626238 0.76223673]
+
 
 Example CLI:
 
@@ -25,5 +38,7 @@ python3 main.py --dataset adult \
 --n_layers 5 \
 --inner_latent_dim 6 \
 --outer_latent_dim 6  \
---kl_weight 0.0 \
---supervised 1
+--kl_weight_inner 0.0 \
+--kl_weight_outer 0.0 \
+--transfer_evaluation 1 \
+--supervised 0
