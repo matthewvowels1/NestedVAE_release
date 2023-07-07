@@ -1,9 +1,12 @@
 # NestedVAE_release
-Release for Nested VAE
+Release for Nested VAE: https://openaccess.thecvf.com/content_CVPR_2020/papers/Vowels_NestedVAE_Isolating_Common_Factors_via_Weak_Supervision_CVPR_2020_paper.pdf
 
+Uses the Adult dataset.
+
+Example CLI:
 
 python3 main.py --dataset adult \
---max_iters 40000 \
+--max_iters 50000 \
 --validation_fraction 0.3 \
 --device cuda \
 --existing_inner_model_path  None \
@@ -15,7 +18,7 @@ python3 main.py --dataset adult \
 --eval_interval 2000 \
 --eval_iters 50 \
 --learning_rate 1e-3 \
---save_iter 10000 \
+--save_iter 50000 \
 --dropout_rate 0.3 \
 --n_layers 5 \
 --inner_latent_dim 6 \

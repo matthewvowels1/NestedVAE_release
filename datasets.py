@@ -11,14 +11,14 @@ def get_data(dataset, data_dir, seed=None):
 		train_data = np.load(os.path.join(data_dir, 'Adult_train_data_no_gender.npy')).astype(np.float32)
 		test_data = np.load(os.path.join(data_dir, 'Adult_test_data_no_gender.npy')).astype(np.float32)
 
-		target_task_train = torch.from_numpy(train_data[:, -1])
-		target_task_test = torch.from_numpy(test_data[:, -1])
+		target_task_train = torch.from_numpy(train_data[:, -1]).to(torch.bool)
+		target_task_test = torch.from_numpy(test_data[:, -1]).to(torch.bool)
 
 		train_data = train_data[:, :-1]
 		test_data = test_data[:, :-1]
 
-		sensitive_train = torch.load(os.path.join(data_dir, 'ADULT_GENDER_TRAIN.pt')).to(torch.float32)
-		sensitive_test = torch.load(os.path.join(data_dir, 'ADULT_GENDER_TEST.pt')).to(torch.float32)
+		sensitive_train = torch.load(os.path.join(data_dir, 'ADULT_GENDER_TRAIN.pt')).to(torch.bool)
+		sensitive_test = torch.load(os.path.join(data_dir, 'ADULT_GENDER_TEST.pt')).to(torch.bool)
 
 		train_data_mu = train_data.mean(0)
 		train_data_std = train_data.std(0)

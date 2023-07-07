@@ -5,7 +5,7 @@ import os
 recon_func = torch.nn.MSELoss()
 
 def vae_loss(y_true, y_pred, log_sigma, mu):
-    """ Compute loss = reconstruction loss + KL loss for each data in minibatch """
+    """ Compute loss and return reconstruction loss and KL loss for each item in a batch """
     # E[log P(X|z)]
     recon = recon_func(y_pred, y_true)
     # D_KL(Q(z|X) || P(z|X)); calculate in closed form as both dist. are Gaussian
@@ -18,17 +18,17 @@ def get_inner_batch(train_data, val_data, split, batch_size, target_task_train, 
     '''
     Takes data, target task labels and (if supervised=True) sensitive factor labels and creates vae
      input/reconstruction pairings according to these labels.
-    :param train_data:
-    :param val_data:
-    :param split:
-    :param batch_size:
-    :param target_task_train:
-    :param target_task_val:
-    :param device:
-    :param sensitive_train:
-    :param sensitive_val:
+    :param train_data: (N_train, embedding_dimension)
+    :param val_data: (N_val, embedding_dimension)
+    :param split:  string('train' or 'val')
+    :param batch_size: integer batch size
+    :param target_task_train:  boolean vector for intended downstream task (N_train)
+    :param target_task_val: boolean vector for intended downstream task (N_val)
+    :param device:  'cpu' or 'cuda'
+    :param sensitive_train: boolean vector for sensitive factor (N_train)
+    :param sensitive_val: boolean vector for sensitive factor (N_val)
     :param supervised: True/False
-    :return:
+    :return: input and target batch (bs, embedding_dimension)
     '''
 
     data = train_data if split == 'train' else val_data
@@ -56,10 +56,11 @@ def get_inner_batch(train_data, val_data, split, batch_size, target_task_train, 
         ix_T0_S0 = torch.randint(0, len(data_T0_S0), (batch_size // 4,))
 
         quarter_batch_T1_S1 = data_T1_S1[ix_T1_S1]
-        quarter_batch_T1_S0 = data_T1_S1[ix_T1_S0]
-        quarter_batch_T0_S1 = data_T1_S1[ix_T0_S1]
-        quarter_batch_T0_S0 = data_T1_S1[ix_T0_S0]
+        quarter_batch_T1_S0 = data_T1_S0[ix_T1_S0]
+        quarter_batch_T0_S1 = data_T0_S1[ix_T0_S1]
+        quarter_batch_T0_S0 = data_T0_S0[ix_T0_S0]
 
+        # switcharoo so sensitive factor is always paired with its opposite value for reconstruction
         x_in = torch.cat([quarter_batch_T1_S1, quarter_batch_T1_S0, quarter_batch_T0_S1, quarter_batch_T0_S0])
         x_out = torch.cat([quarter_batch_T1_S0, quarter_batch_T1_S1, quarter_batch_T0_S0, quarter_batch_T0_S1])
 
@@ -83,6 +84,15 @@ def get_inner_batch(train_data, val_data, split, batch_size, target_task_train, 
 
 
 def get_outer_batch(train_data, val_data, split, batch_size, device):
+    '''
+    Samples batches for training the outer vae (simple)
+    :param train_data:
+    :param val_data:
+    :param split:
+    :param batch_size:
+    :param device:
+    :return:
+    '''
     data = train_data if split == 'train' else val_data
     ix = torch.randint(0, len(data), (batch_size,))
     x = data[ix]
