@@ -12,9 +12,9 @@ Balanced accuracy for sensitive factor on inner VAE embeddings: 0.63394020524385
 Balanced accuracy for target factor on inner VAE embeddings: 0.70786467041597
 
 When transfer_evaluation = True:
-Balanced accuracy for target factor on inner VAE embeddings: 0.5962623839569002
-Adjusted Parity across the two transfer domains:  0.2614595002631862  for  domain scores [0.59626238 0.76223673]
-
+Trains nestedVAE as normal, but tests the RDF task prediction on the two sensitive domains separately, before
+combining results to compute the adjusted parity metrics, which indicates (a) how well the classifier does
+at its intended task, and (b) whether the performance varies much between the two domains (ideally it wouldn't).
 
 Example CLI:
 
@@ -41,4 +41,4 @@ python3 main.py --dataset adult \
 --kl_weight_inner 0.0 \
 --kl_weight_outer 0.0 \
 --transfer_evaluation 1 \
---supervised 0
+--supervised 1

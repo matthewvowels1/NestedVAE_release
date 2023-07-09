@@ -51,7 +51,7 @@ def get_data(dataset, data_dir, seed=None, transfer_evaluation='all'):
 			target_task_test_0 = target_task_test[idx_test_0]
 
 			print('Training shape:', train_data.shape, ' Testing shape:', test_data.shape)
-			return train_data_1, train_data_0, test_data_1, test_data_0, target_task_train_1, target_task_train_0, target_task_test_1, target_task_test_0
+			return idx_train_1, idx_train_0, idx_test_1, idx_test_0, train_data_1, train_data_0, test_data_1, test_data_0, target_task_train_1, target_task_train_0, target_task_test_1, target_task_test_0
 		else:
 			return train_data, test_data, target_task_train, target_task_test, sensitive_train, sensitive_test
 
@@ -59,7 +59,5 @@ def get_data(dataset, data_dir, seed=None, transfer_evaluation='all'):
 
 	else:
 		print('Sorry, dataset does not yet exist. Try using "adult".')
-
-	return train_data, test_data, target_task_train, target_task_test, sensitive_train, sensitive_test
 
 

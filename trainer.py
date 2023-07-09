@@ -14,12 +14,12 @@ def vae_loss(y_true, y_pred, log_sigma, mu):
     return recon, kl
 
 
-def get_inner_batch(train_data, val_data, split, batch_size, target_task_train, target_task_val, device, sensitive_train=None, sensitive_val=None, supervised=False):
+def get_inner_batch(train_data, test_data, split, batch_size, target_task_train, target_task_test, device, sensitive_train=None, sensitive_test=None, supervised=False):
     '''
     Takes data, target task labels and (if supervised=True) sensitive factor labels and creates vae
      input/reconstruction pairings according to these labels.
     :param train_data: (N_train, embedding_dimension)
-    :param val_data: (N_val, embedding_dimension)
+    :param test_data: (N_val, embedding_dimension)
     :param split:  string('train' or 'val')
     :param batch_size: integer batch size
     :param target_task_train:  boolean vector for intended downstream task (N_train)
@@ -31,11 +31,11 @@ def get_inner_batch(train_data, val_data, split, batch_size, target_task_train, 
     :return: input and target batch (bs, embedding_dimension)
     '''
 
-    data = train_data if split == 'train' else val_data
-    target_task = target_task_train if split == 'train' else target_task_val
+    data = train_data if split == 'train' else test_data
+    target_task = target_task_train if split == 'train' else target_task_test
 
     if supervised:
-        sensitive = sensitive_train if split == 'train' else sensitive_val
+        sensitive = sensitive_train if split == 'train' else sensitive_test
 
         # get indices according to values of target and sensitive values
         indices_T1_S1 = (target_task & sensitive).nonzero(as_tuple=True)[0]
@@ -83,23 +83,23 @@ def get_inner_batch(train_data, val_data, split, batch_size, target_task_train, 
     return x_in.to(device), x_out.to(device)
 
 
-def get_outer_batch(train_data, val_data, split, batch_size, device):
+def get_outer_batch(train_data, test_data, split, batch_size, device):
     '''
     Samples batches for training the outer vae (simple)
     :param train_data:
-    :param val_data:
+    :param test_data:
     :param split:
     :param batch_size:
     :param device:
     :return:
     '''
-    data = train_data if split == 'train' else val_data
+    data = train_data if split == 'train' else test_data
     ix = torch.randint(0, len(data), (batch_size,))
     x = data[ix]
     return x.to(device)
 
 @torch.no_grad()
-def estimate_loss(model, model_name, train_data, val_data, batch_size, eval_iters, device, kl_weight, target_task_train=None, target_task_val=None, sensitive_train=None, sensitive_val=None, supervised=False):
+def estimate_loss(model, model_name, train_data, test_data, batch_size, eval_iters, device, kl_weight, target_task_train=None, target_task_test=None, sensitive_train=None, sensitive_test=None, supervised=False):
     out = {}
     model.eval()
     for split in ['train', 'val']:
@@ -108,18 +108,18 @@ def estimate_loss(model, model_name, train_data, val_data, batch_size, eval_iter
 
             if model_name == 'inner':
                 xb, target = get_inner_batch(train_data=train_data,
-                                     val_data=val_data,
+                                     test_data=test_data,
                                      split=split,
                                      device=device,
                                      target_task_train=target_task_train,
-                                     target_task_val=target_task_val,
+                                     target_task_test=target_task_test,
                                      batch_size=batch_size,
                                              sensitive_train=sensitive_train,
-                                             sensitive_val=sensitive_val,supervised=supervised)
+                                             sensitive_test=sensitive_test,supervised=supervised)
 
             elif model_name == 'outer':
                 xb = get_outer_batch(train_data=train_data,
-                                     val_data=val_data,
+                                     test_data=test_data,
                                      split=split,
                                      device=device,
                                      batch_size=batch_size)
@@ -135,7 +135,7 @@ def estimate_loss(model, model_name, train_data, val_data, batch_size, eval_iter
     model.train()
     return out
 
-def train(model, inner_model, optimizer, train_data, val_data, device, batch_size, save_iter, model_save_path, eval_interval, eval_iters, iterations=1000, start_iter=None, kl_weight=1.0, supervised=False, target_task_train=None, target_task_val=None, sensitive_train=None, sensitive_val=None):
+def train(model, inner_model, optimizer, train_data, test_data, device, batch_size, save_iter, model_save_path, eval_interval, eval_iters, iterations=1000, start_iter=None, kl_weight=1.0, supervised=False, target_task_train=None, target_task_test=None, sensitive_train=None, sensitive_test=None):
 
     model_name = 'inner' if inner_model else 'outer'
 
@@ -145,17 +145,17 @@ def train(model, inner_model, optimizer, train_data, val_data, device, batch_siz
     for iter_ in range(start_iter, iterations):
         if model_name == 'inner':
             xb, target = get_inner_batch(train_data=train_data,
-                                         val_data=val_data,
+                                         test_data=test_data,
                                          target_task_train=target_task_train,
-                                         target_task_val=target_task_val,
+                                         target_task_test=target_task_test,
                                          split='train',
                                          device=device,
                                          batch_size=batch_size,
                                              sensitive_train=sensitive_train,
-                                             sensitive_val=sensitive_val,
+                                             sensitive_test=sensitive_test,
                                          supervised=supervised)
         elif model_name == 'outer':
-            xb = get_outer_batch(train_data=train_data, val_data=val_data, split='train', device=device, batch_size=batch_size)
+            xb = get_outer_batch(train_data=train_data, test_data=test_data, split='train', device=device, batch_size=batch_size)
             target = xb
 
         if iter_ % eval_interval == 0:
@@ -163,14 +163,14 @@ def train(model, inner_model, optimizer, train_data, val_data, device, batch_siz
             losses = estimate_loss(model=model,
                                    model_name=model_name,
                                         train_data=train_data,
-                                        val_data=val_data,
+                                        test_data=test_data,
                                         eval_iters=eval_iters,
                                         batch_size=batch_size,
                                         device=device,
                                        target_task_train=target_task_train,
-                                       target_task_val=target_task_val,
+                                       target_task_test=target_task_test,
                                    sensitive_train=sensitive_train,
-                                   sensitive_val=sensitive_val,
+                                   sensitive_test=sensitive_test,
                                    kl_weight=kl_weight,
                                    supervised=supervised)
 

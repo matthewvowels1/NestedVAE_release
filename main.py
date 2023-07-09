@@ -26,196 +26,66 @@ def main(args):
 		print("The new directory {} is created!".format(checkpoint_fn))
 
 	transfer_evaluation = True if args.transfer_evaluation == 1 else False
-	if transfer_evaluation:
-		assert not supervised,  'Cannot be supervised if evaluating for transfer learning.'
 
 	bac_inners_target_task = []
 	inner_embeddings = {}
 
 	# Get data
+	train_data, test_data, target_task_train, target_task_test, sensitive_train, sensitive_test = get_data(dataset=dataset, data_dir=data_dir, seed=None, transfer_evaluation=False)
+	data_shape = train_data.shape[1]
+
 	if transfer_evaluation:
-		train_data_1, train_data_0, test_data_1, test_data_0, target_task_train_1, target_task_train_0, target_task_val_1, target_task_val_0 = get_data(dataset=dataset, data_dir=data_dir, seed=None, transfer_evaluation=transfer_evaluation)
-		data_shape = train_data_1.shape[1]
-	else:
-		train_data, test_data, target_task_train, target_task_val, sensitive_train, sensitive_val = get_data(dataset=dataset, data_dir=data_dir, seed=None, transfer_evaluation=transfer_evaluation)
-		data_shape = train_data.shape[1]
+		idx_train_1, idx_train_0, idx_test_1, idx_test_0, train_data_1, train_data_0, test_data_1, test_data_0, target_task_train_1, target_task_train_0, target_task_test_1, target_task_test_0 = get_data(dataset=dataset, data_dir=data_dir, seed=None, transfer_evaluation=transfer_evaluation)
 
 	# initialize inner and outer VAEs
 	inner_latent_dim = args.inner_latent_dim
 	outer_latent_dim = args.outer_latent_dim
 
-	bac_transfer = {}
-	if transfer_evaluation:
-		outer_VAE = model.outerVAE(in_size=data_shape,
-		                           h_size=args.num_neurons,
-		                           latent_size=outer_latent_dim,
-		                           n_layers=args.n_layers,
-		                           dropout_rate=args.dropout_rate,
-		                           device=device).to(device)
 
-		inner_VAE = model.innerVAE(in_size=outer_latent_dim,
-		                           h_size=args.num_neurons,
-		                           latent_size=inner_latent_dim,
-		                           n_layers=args.n_layers,
-		                           dropout_rate=args.dropout_rate,
-		                           device=device).to(device)
-		print('Train outer VAE first.')
-		optimizer_outer = torch.optim.AdamW(outer_VAE.parameters(), lr=args.learning_rate_outer)
-		if args.existing_outer_model_path == 'None':
-			print('No existing model path specified, training from scratch for {} iterations.'.format(args.max_iters_outer))
-			trainer.train(model=outer_VAE,
-		              inner_model=False,
-		              optimizer=optimizer_outer,
-		              iterations=args.max_iters_outer,
-		              device=device,
-		              batch_size=args.batch_size,
-		              save_iter=args.save_iter,
-		              model_save_path=args.model_save_path,
-		              eval_interval=args.eval_interval,
-		              eval_iters=args.eval_iters,
-		              train_data=train_data_1,
-		              val_data=test_data_1,
-		              target_task_train=target_task_train_1,
-		              target_task_val=target_task_val_1,
-			              kl_weight=args.kl_weight_outer,
-				              sensitive_train=None,
-				              sensitive_val=None, supervised=supervised
-		              )
+	# regular training (not transfer evaluation)
+	outer_VAE = model.outerVAE(in_size=data_shape,
+	                           h_size=args.num_neurons,
+	                           latent_size=outer_latent_dim,
+	                           n_layers=args.n_layers,
+	                           dropout_rate=args.dropout_rate,
+	                           device=device).to(device)
 
-		else:  # if existing checkpoint file is given, compare iteration against max_iters and finish training if necessary
-			print('Loading checkpoint file at: ', args.existing_model_path)
-			checkpoint = torch.load(args.existing_outer_model_path)
-			outer_VAE.load_state_dict(checkpoint['model_state_dict'])
-			optimizer_outer.load_state_dict(checkpoint['optimizer_state_dict'])
-			checkpoint_iter = checkpoint['iteration']
+	inner_VAE = model.innerVAE(in_size=outer_latent_dim,
+	                           h_size=args.num_neurons,
+	                           latent_size=inner_latent_dim,
+	                           n_layers=args.n_layers,
+	                           dropout_rate=args.dropout_rate,
+	                           device=device).to(device)
+	print('Train outer VAE first.')
+	optimizer_outer = torch.optim.AdamW(outer_VAE.parameters(), lr=args.learning_rate_outer)
+	if args.existing_outer_model_path == 'None':
+		print('No existing model path specified, training from scratch for {} iterations.'.format(args.max_iters_outer))
+		trainer.train(model=outer_VAE,
+	              inner_model=False,
+	              optimizer=optimizer_outer,
+	              iterations=args.max_iters_outer,
+	              device=device,
+	              batch_size=args.batch_size,
+	              save_iter=args.save_iter,
+	              model_save_path=args.model_save_path,
+	              eval_interval=args.eval_interval,
+	              eval_iters=args.eval_iters,
+	              train_data=train_data,
+	              test_data=test_data,
+	              target_task_train=target_task_train,
+	              target_task_test=target_task_test,
+		              kl_weight=args.kl_weight_outer,
+			              sensitive_train=sensitive_train,
+			              sensitive_test=sensitive_test, supervised=supervised
+	              )
+	else:  # if existing checkpoint file is given, compare iteration against max_iters and finish training if necessary
+		print('Loading checkpoint file at: ', args.existing_model_path)
+		checkpoint = torch.load(args.existing_outer_model_path)
+		outer_VAE.load_state_dict(checkpoint['model_state_dict'])
+		optimizer_outer.load_state_dict(checkpoint['optimizer_state_dict'])
+		checkpoint_iter = checkpoint['iteration']
 
-			if checkpoint_iter != args.max_iters_outer:
-				trainer.train(model=outer_VAE,
-				              inner_model=False,
-				              optimizer=optimizer_outer,
-				              iterations=args.max_iters_outer,
-				              device=device,
-				              batch_size=args.batch_size,
-				              save_iter=args.save_iter,
-				              model_save_path=args.model_save_path,
-				              eval_interval=args.eval_interval,
-				              eval_iters=args.eval_iters,
-				              train_data=train_data_1,
-				              val_data=test_data_1,
-				              target_task_train=target_task_train_1,
-				              target_task_val=target_task_val_1,
-				              start_iter=checkpoint_iter,
-			              kl_weight=args.kl_weight_outer,
-				              sensitive_train=None,
-				              sensitive_val=None, supervised=supervised
-				              )
-
-
-		print('Generate mean embeddings to train and test the inner VAE.')
-
-		_, outer_embeddings_train_1, _ = outer_VAE(train_data_1.to(device))
-		_, outer_embeddings_test_1, _ = outer_VAE(test_data_1.to(device))
-
-		_, outer_embeddings_train_0, _ = outer_VAE(train_data_0.to(device))
-		_, outer_embeddings_test_0, _ = outer_VAE(test_data_0.to(device))
-
-		outer_embeddings_train_1 = outer_embeddings_train_1.detach()
-		outer_embeddings_test_1 = outer_embeddings_test_1.detach()
-
-		outer_embeddings_train_0 = outer_embeddings_train_0.detach()
-		outer_embeddings_test_0 = outer_embeddings_test_0.detach()
-
-		print('Train inner VAE.')
-		optimizer_inner = torch.optim.AdamW(inner_VAE.parameters(), lr=args.learning_rate_inner)
-		if args.existing_inner_model_path == 'None':  # if no specified checkpoint file is given, train the model
-			print('No existing model path specified, training from scratch for {} iterations.'.format(args.max_iters_inner))
-			trainer.train(model=inner_VAE,
-			              inner_model=True,
-			              optimizer=optimizer_inner,
-			              iterations=args.max_iters_inner,
-			              device=device,
-			              batch_size=args.batch_size,
-			              save_iter=args.save_iter,
-			              model_save_path=args.model_save_path,
-			              eval_interval=args.eval_interval,
-			              eval_iters=args.eval_iters,
-			              train_data=outer_embeddings_train_1,
-			              val_data=outer_embeddings_test_1,
-			              target_task_train=target_task_train_1,
-			              target_task_val=target_task_val_1,
-			              kl_weight=args.kl_weight_inner,
-				              sensitive_train=None,
-				              sensitive_val=None, supervised=supervised
-			              )
-
-		else:  # if existing checkpoint file is given, compare iteration against max_iters and finish training if necessary
-			print('Loading inner checkpoint file at: ', args.existing_model_path)
-			checkpoint = torch.load(args.existing_inner_model_path)
-			inner_VAE.load_state_dict(checkpoint['model_state_dict'])
-			optimizer_inner.load_state_dict(checkpoint['optimizer_state_dict'])
-			checkpoint_iter = checkpoint['iteration']
-
-			if checkpoint_iter != args.max_iters_inner:
-				trainer.train(model=inner_VAE,
-				              inner_model=True,
-				              optimizer=optimizer_inner,
-				              iterations=args.max_iters_inner,
-				              device=device,
-				              batch_size=args.batch_size,
-				              save_iter=args.save_iter,
-				              model_save_path=args.model_save_path,
-				              eval_interval=args.eval_interval,
-				              eval_iters=args.eval_iters,
-				              train_data=outer_embeddings_train_1,
-				              val_data=outer_embeddings_test_1,
-				              target_task_train=target_task_train_1,
-				              target_task_val=target_task_val_1,
-				              start_iter=checkpoint_iter,
-			              kl_weight=args.kl_weight_inner,
-				              sensitive_train=None,
-				              sensitive_val=None, supervised=supervised
-				              )
-
-		print('Generate mean embeddings from the inner VAE.')
-
-		_, inner_embeddings_train_1, _ = inner_VAE(outer_embeddings_train_1.to(device))
-		_, inner_embeddings_test_1, _ = inner_VAE(outer_embeddings_test_1.to(device))
-
-		_, inner_embeddings_train_0, _ = inner_VAE(outer_embeddings_train_0.to(device))
-		_, inner_embeddings_test_0, _ = inner_VAE(outer_embeddings_test_0.to(device))
-
-		inner_embeddings_train_1 = inner_embeddings_train_1.detach()
-		inner_embeddings_test_1 = inner_embeddings_test_1.detach()
-
-		inner_embeddings_train_0 = inner_embeddings_train_0.detach()
-		inner_embeddings_test_0 = inner_embeddings_test_0.detach()
-
-
-		# Test whether the target factor can be predicted from the inner VAE embeddings in the transfer domain
-		BAC_inner_target_task = tester.predict_label(train_X=inner_embeddings_train_0, test_X=inner_embeddings_test_0, train_y=target_task_train_0,
-		                                           test_y=target_task_val_0)
-		print('Balanced accuracy for target factor on inner VAE embeddings:', BAC_inner_target_task)
-		bac_transfer['train_1_test_0'] = BAC_inner_target_task
-
-		######################## now repeat for other transfer domain ########################
-		outer_VAE = model.outerVAE(in_size=data_shape,
-		                           h_size=args.num_neurons,
-		                           latent_size=outer_latent_dim,
-		                           n_layers=args.n_layers,
-		                           dropout_rate=args.dropout_rate,
-		                           device=device).to(device)
-
-		inner_VAE = model.innerVAE(in_size=outer_latent_dim,
-		                           h_size=args.num_neurons,
-		                           latent_size=inner_latent_dim,
-		                           n_layers=args.n_layers,
-		                           dropout_rate=args.dropout_rate,
-		                           device=device).to(device)
-		print('Train outer VAE first.')
-		optimizer_outer = torch.optim.AdamW(outer_VAE.parameters(), lr=args.learning_rate_outer)
-		if args.existing_outer_model_path == 'None':
-			print('No existing model path specified, training from scratch for {} iterations.'.format(
-				args.max_iters_outer))
+		if checkpoint_iter != args.max_iters_outer:
 			trainer.train(model=outer_VAE,
 			              inner_model=False,
 			              optimizer=optimizer_outer,
@@ -226,215 +96,56 @@ def main(args):
 			              model_save_path=args.model_save_path,
 			              eval_interval=args.eval_interval,
 			              eval_iters=args.eval_iters,
-			              train_data=train_data_0,
-			              val_data=test_data_0,
-			              target_task_train=target_task_train_0,
-			              target_task_val=target_task_val_0,
-			              kl_weight=args.kl_weight_outer,
-			              sensitive_train=None,
-			              sensitive_val=None, supervised=supervised
-			              )
-		else:  # if existing checkpoint file is given, compare iteration against max_iters and finish training if necessary
-			print('Loading checkpoint file at: ', args.existing_model_path)
-			checkpoint = torch.load(args.existing_outer_model_path)
-			outer_VAE.load_state_dict(checkpoint['model_state_dict'])
-			optimizer_outer.load_state_dict(checkpoint['optimizer_state_dict'])
-			checkpoint_iter = checkpoint['iteration']
-
-			if checkpoint_iter != args.max_iters_outer:
-				trainer.train(model=outer_VAE,
-				              inner_model=False,
-				              optimizer=optimizer_outer,
-				              iterations=args.max_iters_outer,
-				              device=device,
-				              batch_size=args.batch_size,
-				              save_iter=args.save_iter,
-				              model_save_path=args.model_save_path,
-				              eval_interval=args.eval_interval,
-				              eval_iters=args.eval_iters,
-				              train_data=train_data_0,
-				              val_data=test_data_0,
-				              target_task_train=target_task_train_0,
-				              target_task_val=target_task_val_0,
-				              start_iter=checkpoint_iter,
-				              kl_weight=args.kl_weight_outer,
-				              sensitive_train=None,
-				              sensitive_val=None, supervised=supervised
-				              )
-
-		print('Generate mean embeddings to train and test the inner VAE.')
-
-		_, outer_embeddings_train_0, _ = outer_VAE(train_data_0.to(device))
-		_, outer_embeddings_test_0, _ = outer_VAE(test_data_0.to(device))
-
-		_, outer_embeddings_train_1, _ = outer_VAE(train_data_1.to(device))
-		_, outer_embeddings_test_1, _ = outer_VAE(test_data_1.to(device))
-
-		outer_embeddings_train_0 = outer_embeddings_train_0.detach()
-		outer_embeddings_test_0 = outer_embeddings_test_0.detach()
-
-		outer_embeddings_train_1 = outer_embeddings_train_1.detach()
-		outer_embeddings_test_1 = outer_embeddings_test_1.detach()
-
-		print('Train inner VAE.')
-		optimizer_inner = torch.optim.AdamW(inner_VAE.parameters(), lr=args.learning_rate_inner)
-		if args.existing_inner_model_path == 'None':  # if no specified checkpoint file is given, train the model
-			print('No existing model path specified, training from scratch for {} iterations.'.format(
-				args.max_iters_inner))
-			trainer.train(model=inner_VAE,
-			              inner_model=True,
-			              optimizer=optimizer_inner,
-			              iterations=args.max_iters_inner,
-			              device=device,
-			              batch_size=args.batch_size,
-			              save_iter=args.save_iter,
-			              model_save_path=args.model_save_path,
-			              eval_interval=args.eval_interval,
-			              eval_iters=args.eval_iters,
-			              train_data=outer_embeddings_train_0,
-			              val_data=outer_embeddings_test_0,
-			              target_task_train=target_task_train_0,
-			              target_task_val=target_task_val_0,
-			              kl_weight=args.kl_weight_inner,
-			              sensitive_train=None,
-			              sensitive_val=None, supervised=supervised
+			              train_data=train_data,
+			              test_data=test_data,
+			              target_task_train=target_task_train,
+			              target_task_test=target_task_test,
+			              start_iter=checkpoint_iter,
+		              kl_weight=args.kl_weight_outer,
+			              sensitive_train=sensitive_train,
+			              sensitive_test=sensitive_test, supervised=supervised
 			              )
 
-		else:  # if existing checkpoint file is given, compare iteration against max_iters and finish training if necessary
-			print('Loading inner checkpoint file at: ', args.existing_model_path)
-			checkpoint = torch.load(args.existing_inner_model_path)
-			inner_VAE.load_state_dict(checkpoint['model_state_dict'])
-			optimizer_inner.load_state_dict(checkpoint['optimizer_state_dict'])
-			checkpoint_iter = checkpoint['iteration']
 
-			if checkpoint_iter != args.max_iters_inner:
-				trainer.train(model=inner_VAE,
-				              inner_model=True,
-				              optimizer=optimizer_inner,
-				              iterations=args.max_iters_inner,
-				              device=device,
-				              batch_size=args.batch_size,
-				              save_iter=args.save_iter,
-				              model_save_path=args.model_save_path,
-				              eval_interval=args.eval_interval,
-				              eval_iters=args.eval_iters,
-				              train_data=outer_embeddings_train_0,
-				              val_data=outer_embeddings_test_0,
-				              target_task_train=target_task_train_0,
-				              target_task_val=target_task_val_0,
-				              start_iter=checkpoint_iter,
-				              kl_weight=args.kl_weight_inner,
-				              sensitive_train=None,
-				              sensitive_val=None, supervised=supervised
-				              )
+	print('Generate mean embeddings to train the inner VAE.')
 
-		print('Generate mean embeddings from the inner VAE.')
+	_, outer_embeddings_train, _ = outer_VAE(train_data.to(device))
+	_, outer_embeddings_test, _ = outer_VAE(test_data.to(device))
 
-		_, inner_embeddings_train_0, _ = inner_VAE(outer_embeddings_train_0.to(device))
-		_, inner_embeddings_test_0, _ = inner_VAE(outer_embeddings_test_0.to(device))
+	outer_embeddings_train = outer_embeddings_train.detach()
+	outer_embeddings_test = outer_embeddings_test.detach()
 
-		_, inner_embeddings_train_1, _ = inner_VAE(outer_embeddings_train_1.to(device))
-		_, inner_embeddings_test_1, _ = inner_VAE(outer_embeddings_test_1.to(device))
-
-		inner_embeddings_train_0 = inner_embeddings_train_0.detach()
-		inner_embeddings_test_0 = inner_embeddings_test_0.detach()
-
-		inner_embeddings_train_1 = inner_embeddings_train_1.detach()
-		inner_embeddings_test_1 = inner_embeddings_test_1.detach()
-
-		# Test whether the target factor can be predicted from the inner VAE embeddings in the transfer domain
-		BAC_inner_target_task = tester.predict_label(train_X=inner_embeddings_train_1, test_X=inner_embeddings_test_1,
-		                                             train_y=target_task_train_1,
-		                                             test_y=target_task_val_1)
-		print('Balanced accuracy for target factor on inner VAE embeddings:', BAC_inner_target_task)
-		bac_transfer['train_0_test_1'] = BAC_inner_target_task
-
-		# compute adjusted parity across the transfer domains
-		bacs = np.array([bac_transfer['train_0_test_1'], bac_transfer['train_1_test_0']])
-		bac_norm = (bacs - 0.5) / (1.0 - np.min(bacs))
-		av_bac = bac_norm.mean()
-		std_bac = bac_norm.std()
-		adj_parity = av_bac * (1 - 2 * std_bac)
-		print('Adjusted Parity across the two transfer domains: ', adj_parity, ' for ', bacs )
-
-	elif not transfer_evaluation:
-		# regular training (not transfer evaluation)
-		outer_VAE = model.outerVAE(in_size=data_shape,
-		                           h_size=args.num_neurons,
-		                           latent_size=outer_latent_dim,
-		                           n_layers=args.n_layers,
-		                           dropout_rate=args.dropout_rate,
-		                           device=device).to(device)
-
-		inner_VAE = model.innerVAE(in_size=outer_latent_dim,
-		                           h_size=args.num_neurons,
-		                           latent_size=inner_latent_dim,
-		                           n_layers=args.n_layers,
-		                           dropout_rate=args.dropout_rate,
-		                           device=device).to(device)
-		print('Train outer VAE first.')
-		optimizer_outer = torch.optim.AdamW(outer_VAE.parameters(), lr=args.learning_rate_outer)
-		if args.existing_outer_model_path == 'None':
-			print('No existing model path specified, training from scratch for {} iterations.'.format(args.max_iters_outer))
-			trainer.train(model=outer_VAE,
-		              inner_model=False,
-		              optimizer=optimizer_outer,
-		              iterations=args.max_iters_outer,
+	print('Train inner VAE.')
+	optimizer_inner = torch.optim.AdamW(inner_VAE.parameters(), lr=args.learning_rate_inner)
+	if args.existing_inner_model_path == 'None':  # if no specified checkpoint file is given, train the model
+		print('No existing model path specified, training from scratch for {} iterations.'.format(args.max_iters_inner))
+		trainer.train(model=inner_VAE,
+		              inner_model=True,
+		              optimizer=optimizer_inner,
+		              iterations=args.max_iters_inner,
 		              device=device,
 		              batch_size=args.batch_size,
 		              save_iter=args.save_iter,
 		              model_save_path=args.model_save_path,
 		              eval_interval=args.eval_interval,
 		              eval_iters=args.eval_iters,
-		              train_data=train_data,
-		              val_data=test_data,
+		              train_data=outer_embeddings_train,
+		              test_data=outer_embeddings_test,
 		              target_task_train=target_task_train,
-		              target_task_val=target_task_val,
-			              kl_weight=args.kl_weight_outer,
-				              sensitive_train=sensitive_train,
-				              sensitive_val=sensitive_val, supervised=supervised
+		              target_task_test=target_task_test,
+		              kl_weight=args.kl_weight_inner,
+			              sensitive_train=sensitive_train,
+			              sensitive_test=sensitive_test, supervised=supervised
 		              )
-		else:  # if existing checkpoint file is given, compare iteration against max_iters and finish training if necessary
-			print('Loading checkpoint file at: ', args.existing_model_path)
-			checkpoint = torch.load(args.existing_outer_model_path)
-			outer_VAE.load_state_dict(checkpoint['model_state_dict'])
-			optimizer_outer.load_state_dict(checkpoint['optimizer_state_dict'])
-			checkpoint_iter = checkpoint['iteration']
 
-			if checkpoint_iter != args.max_iters_outer:
-				trainer.train(model=outer_VAE,
-				              inner_model=False,
-				              optimizer=optimizer_outer,
-				              iterations=args.max_iters_outer,
-				              device=device,
-				              batch_size=args.batch_size,
-				              save_iter=args.save_iter,
-				              model_save_path=args.model_save_path,
-				              eval_interval=args.eval_interval,
-				              eval_iters=args.eval_iters,
-				              train_data=train_data,
-				              val_data=test_data,
-				              target_task_train=target_task_train,
-				              target_task_val=target_task_val,
-				              start_iter=checkpoint_iter,
-			              kl_weight=args.kl_weight_outer,
-				              sensitive_train=sensitive_train,
-				              sensitive_val=sensitive_val, supervised=supervised
-				              )
+	else:  # if existing checkpoint file is given, compare iteration against max_iters and finish training if necessary
+		print('Loading inner checkpoint file at: ', args.existing_model_path)
+		checkpoint = torch.load(args.existing_inner_model_path)
+		inner_VAE.load_state_dict(checkpoint['model_state_dict'])
+		optimizer_inner.load_state_dict(checkpoint['optimizer_state_dict'])
+		checkpoint_iter = checkpoint['iteration']
 
-
-		print('Generate mean embeddings to train the inner VAE.')
-
-		_, outer_embeddings_train, _ = outer_VAE(train_data.to(device))
-		_, outer_embeddings_test, _ = outer_VAE(test_data.to(device))
-
-		outer_embeddings_train = outer_embeddings_train.detach()
-		outer_embeddings_test = outer_embeddings_test.detach()
-
-		print('Train inner VAE.')
-		optimizer_inner = torch.optim.AdamW(inner_VAE.parameters(), lr=args.learning_rate_inner)
-		if args.existing_inner_model_path == 'None':  # if no specified checkpoint file is given, train the model
-			print('No existing model path specified, training from scratch for {} iterations.'.format(args.max_iters_inner))
+		if checkpoint_iter != args.max_iters_inner:
 			trainer.train(model=inner_VAE,
 			              inner_model=True,
 			              optimizer=optimizer_inner,
@@ -446,83 +157,89 @@ def main(args):
 			              eval_interval=args.eval_interval,
 			              eval_iters=args.eval_iters,
 			              train_data=outer_embeddings_train,
-			              val_data=outer_embeddings_test,
+			              test_data=outer_embeddings_test,
 			              target_task_train=target_task_train,
-			              target_task_val=target_task_val,
-			              kl_weight=args.kl_weight_inner,
-				              sensitive_train=sensitive_train,
-				              sensitive_val=sensitive_val, supervised=supervised
+			              target_task_test=target_task_test,
+			              start_iter=checkpoint_iter,
+		              kl_weight=args.kl_weight_inner,
+			              sensitive_train=sensitive_train,
+			              sensitive_test=sensitive_test, supervised=supervised
 			              )
 
-		else:  # if existing checkpoint file is given, compare iteration against max_iters and finish training if necessary
-			print('Loading inner checkpoint file at: ', args.existing_model_path)
-			checkpoint = torch.load(args.existing_inner_model_path)
-			inner_VAE.load_state_dict(checkpoint['model_state_dict'])
-			optimizer_inner.load_state_dict(checkpoint['optimizer_state_dict'])
-			checkpoint_iter = checkpoint['iteration']
+	print('Generate mean embeddings from the inner VAE.')
 
-			if checkpoint_iter != args.max_iters_inner:
-				trainer.train(model=inner_VAE,
-				              inner_model=True,
-				              optimizer=optimizer_inner,
-				              iterations=args.max_iters_inner,
-				              device=device,
-				              batch_size=args.batch_size,
-				              save_iter=args.save_iter,
-				              model_save_path=args.model_save_path,
-				              eval_interval=args.eval_interval,
-				              eval_iters=args.eval_iters,
-				              train_data=outer_embeddings_train,
-				              val_data=outer_embeddings_test,
-				              target_task_train=target_task_train,
-				              target_task_val=target_task_val,
-				              start_iter=checkpoint_iter,
-			              kl_weight=args.kl_weight_inner,
-				              sensitive_train=sensitive_train,
-				              sensitive_val=sensitive_val, supervised=supervised
-				              )
+	_, inner_embeddings_train, _ = inner_VAE(outer_embeddings_train.to(device))
+	_, inner_embeddings_test, _ = inner_VAE(outer_embeddings_test.to(device))
 
-		print('Generate mean embeddings from the inner VAE.')
-
-		_, inner_embeddings_train, _ = inner_VAE(outer_embeddings_train.to(device))
-		_, inner_embeddings_test, _ = inner_VAE(outer_embeddings_test.to(device))
-
-		inner_embeddings_train = inner_embeddings_train.detach()
-		inner_embeddings_test = inner_embeddings_test.detach()
+	inner_embeddings_train = inner_embeddings_train.detach()
+	inner_embeddings_test = inner_embeddings_test.detach()
 
 
-		# Test whether the target factor can be predicted from the raw data
-		BAC_raw_target_task = tester.predict_label(train_X=train_data, test_X=test_data, train_y=target_task_train, test_y=target_task_val)
-		print('Balanced accuracy for target factor on original data (excluding sensitive factor):', BAC_raw_target_task)
+	# Test whether the target factor can be predicted from the raw data
+	BAC_raw_target_task = tester.predict_label(train_X=train_data, test_X=test_data, train_y=target_task_train, test_y=target_task_test)
+	print('Balanced accuracy for target factor on original data (excluding sensitive factor):', BAC_raw_target_task)
 
-		# Test whether the target factor can be predicted from the outerVAE embeddings
-		BAC_outer_target_task = tester.predict_label(train_X=outer_embeddings_train, test_X=outer_embeddings_test, train_y=target_task_train,
-		                                           test_y=target_task_val)
-		print('Balanced accuracy for target factor on outerVAE embeddings:', BAC_outer_target_task)
+	# Test whether the target factor can be predicted from the outerVAE embeddings
+	BAC_outer_target_task = tester.predict_label(train_X=outer_embeddings_train, test_X=outer_embeddings_test, train_y=target_task_train,
+	                                           test_y=target_task_test)
+	print('Balanced accuracy for target factor on outerVAE embeddings:', BAC_outer_target_task)
+
+	# Test whether the target factor can be predicted from the inner VAE embeddings
+	BAC_inner_target_task = tester.predict_label(train_X=inner_embeddings_train, test_X=inner_embeddings_test, train_y=target_task_train,
+	                                           test_y=target_task_test)
+	print('Balanced accuracy for target factor on inner VAE embeddings:', BAC_inner_target_task)
+	bac_inners_target_task.append(BAC_inner_target_task)
+
+	# Test whether the sensitive factor can be predicted from the raw data
+	BAC_raw_sensitive = tester.predict_label(train_X=train_data, test_X=test_data, train_y=sensitive_train, test_y=sensitive_test)
+	print('Balanced accuracy for sensitive factor on original data (excluding sensitive factor):', BAC_raw_sensitive)
+
+	# Test whether the sensitive factor can be predicted from the outer VAE embeddings
+	BAC_outer_sensitive = tester.predict_label(train_X=outer_embeddings_train, test_X=outer_embeddings_test,
+	                                           train_y=sensitive_train,
+	                                           test_y=sensitive_test)
+
+	print('Balanced accuracy for sensitive factor on outerVAE embeddings:', BAC_outer_sensitive)
+
+	# Test whether the sensitive factor can be predicted from the inner VAE embeddings
+	BAC_inner_sensitive = tester.predict_label(train_X=inner_embeddings_train, test_X=inner_embeddings_test,
+	                                           train_y=sensitive_train,
+	                                           test_y=sensitive_test)
+
+	print('Balanced accuracy for sensitive factor on inner VAE embeddings:', BAC_inner_sensitive)
+
+	if transfer_evaluation:
+		# for each transfer domain, train and RDF on one domain and test it on the other
+
+		inner_embeddings_train_1 = inner_embeddings_train[idx_train_1]
+		inner_embeddings_train_0 = inner_embeddings_train[idx_train_0]
+
+		inner_embeddings_test_1 = inner_embeddings_test[idx_test_1]
+		inner_embeddings_test_0 = inner_embeddings_test[idx_test_0]
 
 		# Test whether the target factor can be predicted from the inner VAE embeddings
-		BAC_inner_target_task = tester.predict_label(train_X=inner_embeddings_train, test_X=inner_embeddings_test, train_y=target_task_train,
-		                                           test_y=target_task_val)
-		print('Balanced accuracy for target factor on inner VAE embeddings:', BAC_inner_target_task)
-		bac_inners_target_task.append(BAC_inner_target_task)
+		BAC_inner_target_task_1 = tester.predict_label(train_X=inner_embeddings_train_1, test_X=inner_embeddings_test_1,
+		                                             train_y=target_task_train_1,
+		                                             test_y=target_task_test_1)
 
-		# Test whether the sensitive factor can be predicted from the raw data
-		BAC_raw_sensitive = tester.predict_label(train_X=train_data, test_X=test_data, train_y=sensitive_train, test_y=sensitive_val)
-		print('Balanced accuracy for sensitive factor on original data (excluding sensitive factor):', BAC_raw_sensitive)
+		BAC_inner_target_task_0 = tester.predict_label(train_X=inner_embeddings_train_0, test_X=inner_embeddings_test_0,
+		                                               train_y=target_task_train_0,
+		                                               test_y=target_task_test_0)
 
-		# Test whether the sensitive factor can be predicted from the outer VAE embeddings
-		BAC_outer_sensitive = tester.predict_label(train_X=outer_embeddings_train, test_X=outer_embeddings_test,
-		                                           train_y=sensitive_train,
-		                                           test_y=sensitive_val)
+		bacs = np.array([BAC_inner_target_task_1, BAC_inner_target_task_0])
+		print('Balanced Accuracies on the two domains:', bacs)
+		print('Average Balanced Accuracy over the two domains:', bacs.mean())
+		# Rescale bacs from 0.5 chance level to 0.0
+		old_min = 0.5
+		old_max = 1.0
+		new_min = 0.0
+		new_max = 1.0
+		bacs_rescaled = ((bacs - old_min) / (old_max - old_min)) * (new_max - new_min) + new_min
+		adj_par = bacs_rescaled.mean() * (1 - (2 * bacs_rescaled.std()))
+		print('Deviation betwen domains:', bacs_rescaled.std())
+		print('Adjusted Parity Metric:', adj_par)
 
-		print('Balanced accuracy for sensitive factor on outerVAE embeddings:', BAC_outer_sensitive)
 
-		# Test whether the sensitive factor can be predicted from the inner VAE embeddings
-		BAC_inner_sensitive = tester.predict_label(train_X=inner_embeddings_train, test_X=inner_embeddings_test,
-		                                           train_y=sensitive_train,
-		                                           test_y=sensitive_val)
-
-		print('Balanced accuracy for sensitive factor on inner VAE embeddings:', BAC_inner_sensitive)
 
 
 
