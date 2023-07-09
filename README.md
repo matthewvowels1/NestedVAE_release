@@ -3,18 +3,17 @@ Release for Nested VAE: https://openaccess.thecvf.com/content_CVPR_2020/papers/V
 
 Runs the Adult dataset.
 
-When transfer_evaluation = False:
-Balanced accuracy for sensitive factor on original data (excluding sensitive factor): 0.8516335258720195
-Balanced accuracy for target factor on original data (excluding sensitive factor): 0.8329596696559761
-Balanced accuracy for sensitive factor on outerVAE embeddings: 0.6594728609008579
-Balanced accuracy for target factor on outerVAE embeddings: 0.7278588437959164
-Balanced accuracy for sensitive factor on inner VAE embeddings: 0.6339402052438536
-Balanced accuracy for target factor on inner VAE embeddings: 0.70786467041597
+Balanced accuracy for target factor on original data (excluding sensitive factor): 0.8358033135734915
+Balanced accuracy for target factor on outerVAE embeddings: 0.7255028626437655
+Balanced accuracy for target factor on inner VAE embeddings: 0.7252368647717484
+Balanced accuracy for sensitive factor on original data (excluding sensitive factor): 0.8512705672986699
+Balanced accuracy for sensitive factor on outerVAE embeddings: 0.6613172533304057
+Balanced accuracy for sensitive factor on inner VAE embeddings: 0.6547469995566131
+Balanced Accuracies on the two domains: [0.67235903 0.74341637]
+Average Balanced Accuracy over the two domains: 0.7078876999995822
+Deviation betwen domains: 0.07105733840479778
+Adjusted Parity Metric: 0.3566876134029028
 
-When transfer_evaluation = True:
-Trains nestedVAE as normal, but tests the RDF task prediction on the two sensitive domains separately, before
-combining results to compute the adjusted parity metrics, which indicates (a) how well the classifier does
-at its intended task, and (b) whether the performance varies much between the two domains (ideally it wouldn't).
 
 Example CLI:
 
@@ -41,4 +40,4 @@ python3 main.py --dataset adult \
 --kl_weight_inner 0.0 \
 --kl_weight_outer 0.0 \
 --transfer_evaluation 1 \
---supervised 1
+--supervised 1  # this was used in experiments but did not prove to help much (it uses the sensitive label as a way to design the random pairings for inner VAE).
