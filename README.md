@@ -4,14 +4,23 @@ Release for Nested VAE: https://openaccess.thecvf.com/content_CVPR_2020/papers/V
 Runs the Adult dataset.
 
 Balanced accuracy for target factor on original data (excluding sensitive factor): 0.8358033135734915
+
 Balanced accuracy for target factor on outerVAE embeddings: 0.7255028626437655
+
 Balanced accuracy for target factor on inner VAE embeddings: 0.7252368647717484
+
 Balanced accuracy for sensitive factor on original data (excluding sensitive factor): 0.8512705672986699
+
 Balanced accuracy for sensitive factor on outerVAE embeddings: 0.6613172533304057
+
 Balanced accuracy for sensitive factor on inner VAE embeddings: 0.6547469995566131
+
 Balanced Accuracies on the two domains: [0.67235903 0.74341637]
+
 Average Balanced Accuracy over the two domains: 0.7078876999995822
+
 Deviation betwen domains: 0.07105733840479778
+
 Adjusted Parity Metric: 0.3566876134029028
 
 
