@@ -9,6 +9,7 @@ import tester
 import torch
 import matplotlib.pyplot as plt
 import model
+from sklearn.metrics import balanced_accuracy_score
 
 def main(args):
 	np.random.seed(seed=args.seed)
@@ -78,6 +79,7 @@ def main(args):
 			              sensitive_train=sensitive_train,
 			              sensitive_test=sensitive_test, supervised=supervised
 	              )
+
 	else:  # if existing checkpoint file is given, compare iteration against max_iters and finish training if necessary
 		print('Loading checkpoint file at: ', args.existing_model_path)
 		checkpoint = torch.load(args.existing_outer_model_path)
@@ -174,6 +176,8 @@ def main(args):
 	inner_embeddings_train = inner_embeddings_train.detach()
 	inner_embeddings_test = inner_embeddings_test.detach()
 
+	print('-------------RUNNING EVALUATIONS-------------')
+
 
 	# Test whether the target factor can be predicted from the raw data
 	BAC_raw_target_task = tester.predict_label(train_X=train_data, test_X=test_data, train_y=target_task_train, test_y=target_task_test)
@@ -217,6 +221,8 @@ def main(args):
 		inner_embeddings_test_1 = inner_embeddings_test[idx_test_1]
 		inner_embeddings_test_0 = inner_embeddings_test[idx_test_0]
 
+		print('---------------First Adjusted Parity  WITH strict transfer between domains...---------------')
+
 		# Test whether the target factor can be predicted from the inner VAE embeddings
 		BAC_inner_target_task_1 = tester.predict_label(train_X=inner_embeddings_train_1, test_X=inner_embeddings_test_1,
 		                                             train_y=target_task_train_1,
@@ -227,22 +233,41 @@ def main(args):
 		                                               test_y=target_task_test_0)
 
 		bacs = np.array([BAC_inner_target_task_1, BAC_inner_target_task_0])
-		print('Balanced Accuracies on the two domains:', bacs)
-		print('Average Balanced Accuracy over the two domains:', bacs.mean())
-		# Rescale bacs from 0.5 chance level to 0.0
+
 		old_min = 0.5
 		old_max = 1.0
-		new_min = 0.0
-		new_max = 1.0
-		bacs_rescaled = ((bacs - old_min) / (old_max - old_min)) * (new_max - new_min) + new_min
-		adj_par = bacs_rescaled.mean() * (1 - (2 * bacs_rescaled.std()))
-		print('Deviation betwen domains:', bacs_rescaled.std())
-		print('Adjusted Parity Metric:', adj_par)
+		adj_parity_score = tester.adjusted_parity_two_domains(accs=bacs, rescale_acc_min=old_min, rescale_acc_max=old_max)
+
+		print('Balanced Accuracies on the two domains:', bacs)
+		print('Average Balanced Accuracy over the two domains:', bacs.mean())
+		print('Adjusted Parity Metric:', adj_parity_score)
+
+		print('---------------Second Adjusted Parity WITHOUT strict transfer between domains...---------------')
+
+		predictors_train = torch.cat([inner_embeddings_train_1, inner_embeddings_train_0], 0)
+		predictors_test = torch.cat([inner_embeddings_test_1, inner_embeddings_test_0], 0)
+
+		outcome_train = torch.cat([target_task_train_1, target_task_train_0])
+		outcome_test = torch.cat([target_task_test_1, target_task_test_0])
+
+		preds = tester.predict_label(train_X=predictors_train, test_X=predictors_test,
+		                                               train_y=outcome_train,
+		                                               test_y=outcome_test,
+		                                               return_preds=True)
 
 
+		preds_1, preds_0 = preds[:len(target_task_test_1)], preds[len(target_task_test_1):]
 
+		bac1 = balanced_accuracy_score(target_task_test_1, preds_1)
+		bac0 = balanced_accuracy_score(target_task_test_0, preds_0)
+		bacs_no_transfer = np.array([bac1, bac0])
+		old_min = 0.5
+		old_max = 1.0
+		adj_parity_score_no_transfer = tester.adjusted_parity_two_domains(accs=bacs_no_transfer, rescale_acc_min=old_min, rescale_acc_max=old_max)
 
-
+		print('Balanced Accuracies on the two domains WITHOUT transfer:', bacs_no_transfer)
+		print('Average Balanced Accuracy over the two domains WITHOUT transfer:', bacs_no_transfer.mean())
+		print('Adjusted Parity Metric WITHOUT transfer:', adj_parity_score_no_transfer)
 
 
 if __name__ == '__main__':
