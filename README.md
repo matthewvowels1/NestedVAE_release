@@ -3,25 +3,36 @@ Release for Nested VAE: https://openaccess.thecvf.com/content_CVPR_2020/papers/V
 
 Runs the Adult dataset.
 
+-------------RUNNING EVALUATIONS-------------
 Balanced accuracy for target factor on original data (excluding sensitive factor): 0.8358033135734915
 
 Balanced accuracy for target factor on outerVAE embeddings: 0.7255028626437655
 
-Balanced accuracy for target factor on inner VAE embeddings: 0.7252368647717484
+Balanced accuracy for target factor on inner VAE embeddings: 0.7133809596189897
 
 Balanced accuracy for sensitive factor on original data (excluding sensitive factor): 0.8512705672986699
 
 Balanced accuracy for sensitive factor on outerVAE embeddings: 0.6613172533304057
 
-Balanced accuracy for sensitive factor on inner VAE embeddings: 0.6547469995566131
+Balanced accuracy for sensitive factor on inner VAE embeddings: 0.6315625354451732
 
-Balanced Accuracies on the two domains: [0.67235903 0.74341637]
+---------------First Adjusted Parity  WITH strict transfer between domains...---------------
 
-Average Balanced Accuracy over the two domains: 0.7078876999995822
+Balanced Accuracies on the two domains: [0.66696958 0.7418032 ]
 
-Deviation betwen domains: 0.07105733840479778
+Average Balanced Accuracy over the two domains: 0.704386387770519
 
-Adjusted Parity Metric: 0.3566876134029028
+Adjusted Parity Metric: 0.34759288642904607
+
+---------------Second Adjusted Parity WITHOUT strict transfer between domains...---------------
+
+Balanced Accuracies on the two domains WITHOUT transfer: [0.67653127 0.73383648]
+
+Average Balanced Accuracy over the two domains WITHOUT transfer: 0.7051838763083335
+
+Adjusted Parity Metric WITHOUT transfer: 0.3633353328614705
+
+
 
 
 Example CLI:
